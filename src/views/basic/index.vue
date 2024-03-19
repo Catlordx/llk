@@ -1,39 +1,16 @@
 <script setup lang="ts">
-import { IMAGE_PATH, Vertex } from '../../types'
 import { ref, onMounted } from 'vue'
-const imageNames = [
-  'image_0.png',
-  'image_1.png',
-  'image_2.png',
-  'image_3.png',
-  'image_4.png',
-  'image_5.png',
-  'image_6.png',
-  'image_7.png',
-  'image_8.png',
-  'image_9.png',
-]
-const numRows = 10
-const numCols = 16
-const grid: Vertex[][] = []
-// 初始化二维数组 16行10列
-for (let i = 0; i < numRows; i++) {
-  const row: Vertex[] = []
-  for (let j = 0; j < numCols; j++) {
-    // 这里你可以根据需要进行初始化
-    row.push({
-      loc: { row: i, col: j },
-      image: IMAGE_PATH + imageNames[Math.floor(Math.random() * 10)],
-      visible: false,
-    })
-  }
-  console.log(row)
-  grid.push(row)
-}
+import { handleClicked, initializeGrid } from './utils'
+import { Point } from '../../types'
+// 10行16列图片元素
+const grid = initializeGrid(10, 16)
+// 渲染开关
 const isGameStarted = ref(false)
 const startGame = () => {
   isGameStarted.value = true
 }
+const selectedElement: Point[] = []
+// 挂载后加载音频文件，播放音乐
 onMounted(() => {
   const audio = new Audio('/Joel Hanson,Sara Groves - Traveling Light.mp3')
   audio.play()
@@ -60,9 +37,21 @@ onMounted(() => {
       </button>
     </div>
     <div v-if="isGameStarted" class="absolute w-640 top-6 left-2">
+      <!-- BUG 如果利用vue自带的v-for渲染＋v-show控制 -->
+      <!-- 显隐性将会导致图片自动补位！出现问题 -->
+      <!-- 这点在官网有说明 -->
+      <!-- 追要是因为追踪到响应式状态变化，页面重新渲染的问题！ -->
       <div v-for="(row, rowIndex) in grid" :key="rowIndex">
-        <div v-for="(vertex, colIndex) in row" :key="colIndex" style="display: inline-block;">
-          <img :src="vertex.image" />
+        <div
+          v-for="(vertex, colIndex) in row"
+          :key="colIndex"
+          style="display: inline-block"
+        >
+          <img
+            :src="vertex.image"
+            @click="handleClicked(grid, vertex.loc, selectedElement)"
+            :class="{'image':!vertex.visible}"
+          />
         </div>
       </div>
     </div>
@@ -75,5 +64,8 @@ onMounted(() => {
   background-size: cover;
   width: 100%;
   height: 100vh;
+}
+.image {
+  box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
 }
 </style>
