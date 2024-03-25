@@ -18,4 +18,8 @@ export interface Vertex {
    * 该图片是否被消去
    */
   visible: boolean
+  /**
+   * 改图片是否被选中
+   */
+  selected: boolean
 }

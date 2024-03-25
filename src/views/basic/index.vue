@@ -50,7 +50,10 @@ onMounted(() => {
           <img
             :src="vertex.image"
             @click="handleClicked(grid, vertex.loc, selectedElement)"
-            :class="{'image':!vertex.visible}"
+            :class="{
+              'img-transparent': !vertex.visible,
+              image: vertex.selected,
+            }"
           />
         </div>
       </div>
@@ -67,5 +70,8 @@ onMounted(() => {
 }
 .image {
   box-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+}
+.img-transparent {
+  opacity: 0;
 }
 </style>
