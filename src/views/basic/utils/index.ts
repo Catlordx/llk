@@ -55,12 +55,12 @@ export const handleClicked = (
 ) => {
   grid[loc.row][loc.col].selected = true
   selectedElement.push(loc)
+
   if (selectedElement.length === 2) {
-    if (
-      grid[selectedElement[0].row][selectedElement[0].col].image ===
-      grid[selectedElement[1].row][selectedElement[1].col].image
-    ) {
-      if (findPath(grid, selectedElement[0], selectedElement[1], poly)) {
+    const start = selectedElement[0]
+    const end = selectedElement[1]
+    if (grid[start.row][start.col].image === grid[end.row][end.col].image) {
+      if (findPath(grid, start, end, poly)) {
         handleSuccess(grid, selectedElement)
         console.log(poly)
       }
@@ -82,20 +82,14 @@ export function findPath(
   if (!dfs(matrix, current, end, path, visited)) {
     matrix[current.row][current.col].visible = true
     matrix[end.row][end.col].visible = true
+  } else {
+    pl.pl = pointPathToString(path)
+    console.log(pl.pl)
   }
-  path.push({
-    row: end.row,
-    col: end.col,
-  })
-  console.log(path)
-
-  pl.pl = pointPathToString(path)
-  console.log(pl.pl)
-  if (pl.pl.length > 0) {
+  if (path.length > 1) {
     return true
   }
-
-  // return path
+  return false
 }
 function dfs(
   matrix: Vertex[][],
@@ -112,16 +106,18 @@ function dfs(
   path.push(node)
   visited.add(node)
 
-  
+  if (current.col === end.col && current.row === end.row) {
+    return true
+  }
 
   // 寻找当前点的邻居
-  const neighbors = reactive<Point[]>([])
-  const directions = reactive([
+  const neighbors = []
+  const directions = [
     [1, 0], // 右
     [-1, 0], // 左
     [0, 1], // 上
     [0, -1], // 下
-  ])
+  ]
   for (const [dx, dy] of directions) {
     if (
       current.col + dy >= 0 &&
@@ -139,10 +135,6 @@ function dfs(
 
   // 遍历邻居
   for (const neighbor of neighbors) {
-    if (neighbor.col === end.col && neighbor.row === end.row) {
-      return true
-    }
-
     if (!visited.has(neighbor) && !matrix[neighbor.row][neighbor.col].visible) {
       if (dfs(matrix, neighbor, end, path, visited)) return true
     }
