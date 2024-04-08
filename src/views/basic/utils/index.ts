@@ -1,5 +1,13 @@
 import { Vertex, IMAGE_PATH, Point } from '../../../types'
 import { reactive } from 'vue'
+const MATRIX_ROWS = 10
+const MATRIX_COLS = 16
+/**
+ * pl:存放直线上的点的坐标
+ */
+export interface Poly {
+  pl: string
+}
 const imageNames = [
   'image_0.png',
   'image_1.png',
@@ -43,6 +51,7 @@ export const handleClicked = (
   grid: Vertex[][],
   loc: Point,
   selectedElement: Point[],
+  poly: Poly,
 ) => {
   grid[loc.row][loc.col].selected = true
   selectedElement.push(loc)
@@ -51,129 +60,112 @@ export const handleClicked = (
       grid[selectedElement[0].row][selectedElement[0].col].image ===
       grid[selectedElement[1].row][selectedElement[1].col].image
     ) {
-      if (isAdjacent(selectedElement[0], selectedElement[1])) {
+      if (findPath(grid, selectedElement[0], selectedElement[1], poly)) {
         handleSuccess(grid, selectedElement)
-        resetStyle(grid, selectedElement)
-        selectedElement.length = 0
-        return
-      }
-      if (isInline(grid, selectedElement[0], selectedElement[1])) {
-        handleSuccess(grid, selectedElement)
-        resetStyle(grid, selectedElement)
-        selectedElement.length = 0
-        return
-      }
-      if (getByTwoLines(grid, selectedElement[0], selectedElement[1])) {
-        handleSuccess(grid, selectedElement)
-        resetStyle(grid, selectedElement)
-        selectedElement.length = 0
-        return
+        console.log(poly)
       }
     }
     resetStyle(grid, selectedElement)
     selectedElement.length = 0
   }
 }
-/**
- *
- * @param loc_first 被选中的元素1
- * @param loc_second 被选中的元素2
- * @returns true => 相邻元素且种类相同
- */
-const isAdjacent = (loc1: Point, loc2: Point) => {
-  return (
-    (Math.abs(loc1.row - loc2.row) === 1 && loc1.col === loc2.col) ||
-    (Math.abs(loc1.col - loc2.col) === 1 && loc1.row === loc2.row)
-  )
-}
-/**
- * 判断是否在同一条直线上
- * @param grid
- * @param loc_first
- * @param loc_second
- */
-const isInline = (grid: Vertex[][], loc1: Point, loc2: Point) => {
-  if (loc1.row === loc2.row) {
-    const startCol = Math.min(loc1.col, loc2.col)
-    const endCol = Math.max(loc1.col, loc2.col)
-    for (let col = startCol + 1; col < endCol; col++) {
-      if (grid[loc1.row][col].visible !== false) {
-        return false
-      }
-    }
-    if (endCol === startCol + 1) {
-      if (grid[loc1.row][startCol].visible && grid[loc1.row][endCol].visible) {
-        return false
-      }
-    }
+export function findPath(
+  matrix: Vertex[][],
+  current: Point,
+  end: Point,
+  pl: Poly,
+) {
+  let visited = new Set<Point>()
+  let path: Point[] = []
+  matrix[current.row][current.col].visible = false
+  matrix[end.row][end.col].visible = false
+  if (!dfs(matrix, current, end, path, visited)) {
+    matrix[current.row][current.col].visible = true
+    matrix[end.row][end.col].visible = true
+  }
+  path.push({
+    row: end.row,
+    col: end.col,
+  })
+  console.log(path)
+
+  pl.pl = pointPathToString(path)
+  console.log(pl.pl)
+  if (pl.pl.length > 0) {
     return true
   }
 
-  if (loc1.col === loc2.col) {
-    const startRow = Math.min(loc1.row, loc2.row)
-    const endRow = Math.max(loc1.row, loc2.row)
-    for (let row = startRow + 1; row < endRow; row++) {
-      if (grid[row][loc1.col].visible !== false) {
-        return false
+  // return path
+}
+function dfs(
+  matrix: Vertex[][],
+  current: Point,
+  end: Point,
+  path: Point[],
+  visited: Set<Point>,
+) {
+  // 将当前的点添加到路径中
+  const node: Point = {
+    row: current.row,
+    col: current.col,
+  }
+  path.push(node)
+  visited.add(node)
+
+  
+
+  // 寻找当前点的邻居
+  const neighbors = reactive<Point[]>([])
+  const directions = reactive([
+    [1, 0], // 右
+    [-1, 0], // 左
+    [0, 1], // 上
+    [0, -1], // 下
+  ])
+  for (const [dx, dy] of directions) {
+    if (
+      current.col + dy >= 0 &&
+      current.col + dy < MATRIX_COLS &&
+      current.row + dx >= 0 &&
+      current.row + dx < MATRIX_ROWS
+    ) {
+      const neighbor: Point = {
+        row: current.row + dx,
+        col: current.col + dy,
       }
+      neighbors.push(neighbor)
     }
-    if (endRow === startRow + 1) {
-      if (grid[startRow][loc1.col].visible && grid[endRow][loc1.col].visible) {
-        return false
-      }
+  }
+
+  // 遍历邻居
+  for (const neighbor of neighbors) {
+    if (neighbor.col === end.col && neighbor.row === end.row) {
+      return true
     }
 
-    return true
+    if (!visited.has(neighbor) && !matrix[neighbor.row][neighbor.col].visible) {
+      if (dfs(matrix, neighbor, end, path, visited)) return true
+    }
   }
+
+  // 回溯
+  visited.delete(current)
+  path.pop()
   return false
 }
-// BUG 此处判断逻辑有问题！
-/**
- * 判断是否能通过两条直线抵达
- * @param grid
- * @param loc_first
- * @param loc_second
- */
-const getByTwoLines = (
-  grid: Vertex[][],
-  loc_first: Point,
-  loc_second: Point,
-) => {
-  // 拐点1
-  const cornerPointFirst = {
-    row: loc_first.row,
-    col: loc_second.col,
+function pointPathToString(points: Point[]) {
+  let resultString = ''
+  for (let i = 0; i < points.length; i++) {
+    let x = points[i].col * 40 + 26
+    resultString += x.toString()
+    resultString += ','
+    let y = points[i].row * 40 + 48
+    resultString += y.toString()
+    resultString += ' '
   }
-  // 拐点2
-  const cornerPointSecond = {
-    row: loc_second.row,
-    col: loc_first.col,
-  }
-  if (
-    isInline(grid, cornerPointFirst, loc_first) &&
-    isInline(grid, cornerPointFirst, loc_second)
-  ) {
-    return true
-  }
-  if (
-    isInline(grid, cornerPointSecond, loc_first) &&
-    isInline(grid, cornerPointSecond, loc_second)
-  ) {
-    return true
-  }
-  return false
+  return resultString.trimEnd()
 }
-/**
- * 判断是否能够通过三条直线抵达
- * @param grid
- * @param loc_first
- * @param loc_second
- */
-// const getByThreeLines = (
-//   grid: Vertex[][],
-//   loc_first: Point,
-//   loc_second: Point,
-// ) => {}
+
 /**
  * 能够消除的情况
  * @param grid
