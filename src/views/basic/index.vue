@@ -49,7 +49,12 @@ onMounted(() => {
         重排
       </button>
     </div>
-    <svg v-if="svgVisible" width="640" height="400">
+    <svg
+      v-if="svgVisible"
+      width="640"
+      height="400"
+      class="absolute top-6 left-2 z-50"
+    >
       <polyline
         :points="svg_polyline.pl"
         fill="none"
@@ -58,10 +63,6 @@ onMounted(() => {
       />
     </svg>
     <div v-if="isGameStarted" class="absolute w-640 top-6 left-2">
-      <!-- BUG 如果利用vue自带的v-for渲染＋v-show控制 -->
-      <!-- 显隐性将会导致图片自动补位！出现问题 -->
-      <!-- 这点在官网有说明 -->
-      <!-- 追要是因为追踪到响应式状态变化，页面重新渲染的问题！ -->
       <div v-for="(row, rowIndex) in grid" :key="rowIndex">
         <div
           v-for="(vertex, colIndex) in row"

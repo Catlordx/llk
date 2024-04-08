@@ -1,11 +1,114 @@
 // Prevents additional console window on Windows in release, DO NOT REMOVE!!
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
+use std::collections::HashSet;
+
 use image::{DynamicImage, GenericImageView, Rgba};
+use serde::{Deserialize, Serialize};
+
+const MAX_ROWS: i32 = 10;
+const MAX_COLS: i32 = 16;
 // Learn more about Tauri commands at https://tauri.app/v1/guides/features/command
+#[derive(Deserialize, Debug, PartialEq, Eq, Hash, Clone, Copy, Serialize)]
+struct Point {
+    row: i32,
+    col: i32,
+}
+#[derive(Deserialize, Debug, Serialize)]
+#[allow(dead_code)]
+struct Vertex {
+    loc: Point,
+    image: String,
+    visible: bool,
+    selected: bool,
+}
+fn is_turn(path: &Vec<Point>, current: Point) -> bool {
+    if path.len() < 3 {
+        return false;
+    }
+    let sp = path[path.len() - 2];
+    let tp = path[path.len() - 3];
+    if sp.row == tp.row {
+        if current.row != sp.row {
+            return true;
+        }
+    } else {
+        if current.col != sp.col {
+            return true;
+        }
+    }
+    false
+}
+#[tauri::command]
+fn find_path(matrix: Vec<Vec<Vertex>>, current: Point, end: Point) -> Vec<Point> {
+    println!("Hello!");
+    println!("{:?}", current);
+    println!("{:?}", end);
+    let mut visited: HashSet<Point> = HashSet::new();
+    let mut path: Vec<Point> = Vec::new();
+    if !dfs(&matrix, current, end, &mut path, &mut visited, 0) {
+        return path;
+    }
+    println!("{:?}", path);
+    path
+}
+fn dfs(
+    matrix: &Vec<Vec<Vertex>>,
+    current: Point,
+    end: Point,
+    path: &mut Vec<Point>,
+    visited: &mut HashSet<Point>,
+    turns: i32,
+) -> bool {
+    path.push(current);
+    visited.insert(current);
+    println!("Add a point into the path - {:?}", current);
+    if current.col == end.col && current.row == end.row {
+        return true;
+    }
+    let mut neighbors: Vec<Point> = Vec::new();
+    let directions = [(1, 0), (-1, 0), (0, 1), (0, -1)];
+    for (dx, dy) in directions {
+        if current.col + dy >= 0
+            && current.col + dy < MAX_COLS
+            && current.row + dx >= 0
+            && current.row + dx < MAX_ROWS
+        {
+            neighbors.push(Point {
+                row: current.row + dx,
+                col: current.col + dy,
+            })
+        }
+    }
+    for neighbor in neighbors {
+        if !visited.contains(&neighbor)
+            && !matrix[neighbor.row as usize][neighbor.col as usize].visible
+        {
+            let mut new_turns = turns;
+            if is_turn(path, current) {
+                new_turns += 1;
+            }
+            if new_turns > 2 {
+                continue;
+            }
+            println!("Begin to test neighbor {:?}", neighbor);
+            if dfs(matrix, neighbor, end, path, visited, new_turns) {
+                return true;
+            }
+        }
+    }
+    visited.remove(&current);
+    path.pop();
+    println!("remove a point from path - {:?}", current);
+    false
+}
+
+
 #[tauri::command]
 fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
 }
+
 #[tauri::command]
 fn image_handler() {
     // 加载原始图片
@@ -55,7 +158,7 @@ fn image_handler() {
 }
 fn main() {
     tauri::Builder::default()
-        .invoke_handler(tauri::generate_handler![greet, image_handler])
+        .invoke_handler(tauri::generate_handler![greet, image_handler, find_path])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }

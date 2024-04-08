@@ -1,7 +1,6 @@
 import { Vertex, IMAGE_PATH, Point } from '../../../types'
-import { reactive } from 'vue'
-const MATRIX_ROWS = 10
-const MATRIX_COLS = 16
+import { reactive, toRaw } from 'vue'
+import { invoke } from '@tauri-apps/api'
 /**
  * pl:存放直线上的点的坐标
  */
@@ -37,8 +36,6 @@ export function initializeGrid(numRows: number, numCols: number): Vertex[][] {
     }
     grid.push(row)
   }
-  console.log(grid)
-
   return grid
 }
 /**
@@ -47,7 +44,7 @@ export function initializeGrid(numRows: number, numCols: number): Vertex[][] {
  * @param grid 游戏界面元素情况
  * @param loc 选中元素的位置
  */
-export const handleClicked = (
+export const handleClicked = async (
   grid: Vertex[][],
   loc: Point,
   selectedElement: Point[],
@@ -57,107 +54,45 @@ export const handleClicked = (
   selectedElement.push(loc)
 
   if (selectedElement.length === 2) {
-    const start = selectedElement[0]
-    const end = selectedElement[1]
-    if (grid[start.row][start.col].image === grid[end.row][end.col].image) {
-      if (findPath(grid, start, end, poly)) {
-        handleSuccess(grid, selectedElement)
-        console.log(poly)
+    if (
+      grid[selectedElement[0].row][selectedElement[0].col].image ===
+      grid[selectedElement[1].row][selectedElement[1].col].image
+    ) {
+      const start = selectedElement[0]
+      const end = selectedElement[1]
+      let matrix = toRaw(grid)
+      matrix[start.row][start.col].visible = false
+      matrix[end.row][end.col].visible = false
+
+      const demo: Point[] = await invoke('find_path', {
+        matrix: matrix,
+        current: start,
+        end: end,
+      })
+      if (demo.length === 0) {
+        grid[start.row][start.col].visible = true
+        grid[end.row][end.col].visible = true
       }
+      const pathString = pointPathToString(demo)
+      poly.pl = pathString
+      console.log(pathString)
     }
     resetStyle(grid, selectedElement)
     selectedElement.length = 0
   }
 }
-export function findPath(
-  matrix: Vertex[][],
-  current: Point,
-  end: Point,
-  pl: Poly,
-) {
-  let visited = new Set<Point>()
-  let path: Point[] = []
-  matrix[current.row][current.col].visible = false
-  matrix[end.row][end.col].visible = false
-  if (!dfs(matrix, current, end, path, visited)) {
-    matrix[current.row][current.col].visible = true
-    matrix[end.row][end.col].visible = true
-  } else {
-    pl.pl = pointPathToString(path)
-    console.log(pl.pl)
-  }
-  if (path.length > 1) {
-    return true
-  }
-  return false
-}
-function dfs(
-  matrix: Vertex[][],
-  current: Point,
-  end: Point,
-  path: Point[],
-  visited: Set<Point>,
-) {
-  // 将当前的点添加到路径中
-  const node: Point = {
-    row: current.row,
-    col: current.col,
-  }
-  path.push(node)
-  visited.add(node)
-
-  if (current.col === end.col && current.row === end.row) {
-    return true
-  }
-
-  // 寻找当前点的邻居
-  const neighbors = []
-  const directions = [
-    [1, 0], // 右
-    [-1, 0], // 左
-    [0, 1], // 上
-    [0, -1], // 下
-  ]
-  for (const [dx, dy] of directions) {
-    if (
-      current.col + dy >= 0 &&
-      current.col + dy < MATRIX_COLS &&
-      current.row + dx >= 0 &&
-      current.row + dx < MATRIX_ROWS
-    ) {
-      const neighbor: Point = {
-        row: current.row + dx,
-        col: current.col + dy,
-      }
-      neighbors.push(neighbor)
-    }
-  }
-
-  // 遍历邻居
-  for (const neighbor of neighbors) {
-    if (!visited.has(neighbor) && !matrix[neighbor.row][neighbor.col].visible) {
-      if (dfs(matrix, neighbor, end, path, visited)) return true
-    }
-  }
-
-  // 回溯
-  visited.delete(current)
-  path.pop()
-  return false
-}
 function pointPathToString(points: Point[]) {
   let resultString = ''
   for (let i = 0; i < points.length; i++) {
-    let x = points[i].col * 40 + 26
+    let x = points[i].col * 40 + 20
     resultString += x.toString()
     resultString += ','
-    let y = points[i].row * 40 + 48
+    let y = points[i].row * 40 + 20
     resultString += y.toString()
     resultString += ' '
   }
   return resultString.trimEnd()
 }
-
 /**
  * 能够消除的情况
  * @param grid
